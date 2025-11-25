@@ -15,8 +15,7 @@ source venv/bin/activate
 ### 2. Install required Python packages (nbformat might be required)
 
 ```bash
-pip install pandas matplotlib seaborn plotly
-pip install nbformat  
+pip install pandas matplotlib seaborn plotly nbformat
 ```
 
 ### 3. Run the ETL pipeline
