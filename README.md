@@ -1,6 +1,7 @@
 # Rossmann ETL and Machine Learning Project
 
-This repository contains the ETL scripts, exploratory data analysis notebooks, and machine learning models used for the Rossmann tasks.
+This repository contains the ETL scripts, exploratory data analysis notebooks, and machine learning models used for the
+Rossmann tasks.
 
 ## Project Setup
 
@@ -19,15 +20,29 @@ pip install pandas matplotlib seaborn plotly
 
 ### 3. Run the ETL pipeline
 
-This step loads raw CSV files, merges store metadata, state level data, and geo information, performs cleaning, and writes outputs into `Data/processed`.
+This step loads raw CSV files, merges store metadata, state level data, and geo information, performs cleaning, and
+writes outputs into `Data/processed`.
 
 ```bash
 python ETL/etl_main.py
 ```
 
+### 3.1 Install Jupyter Notebook (if not already installed)
+
+```bash install jupyter
+pip install notebook
+```
+
+### 3.2 Launch Jupyter Notebook (if not already launched)
+
+```bash install jupyter
+jupyter notebook
+```
+
 ### 4. Run EDA notebook
 
-Open the notebook inside the `EDA` folder and execute it to generate all statistical summaries, outlier detection, time based analysis, geo visualizations, and interactive charts.
+Open the notebook inside the `EDA` folder and execute it to generate all statistical summaries, outlier detection, time
+based analysis, geo visualizations, and interactive charts.
 
 ## Project Structure
 
@@ -52,4 +67,5 @@ ROSSMANN/
 - The `Data` folder is not tracked in version control unless added manually.
 - The `venv` folder is excluded through `.gitignore`.
 - All scripts assume local file access.
-- Geo and state datasets are merged during ETL to enable advanced visualizations (map based charts, state level comparison, etc.).
+- Geo and state datasets are merged during ETL to enable advanced visualizations (map based charts, state level
+  comparison, etc.).
