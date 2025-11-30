@@ -1,0 +1,4 @@
+Cluster_3,Sales,Customers,SalesPerCustomer,CompetitionDistance,PromoUsage,Promo2,StoreType,State
+0,4998.92,482.93,10.52,3547.68,0.38,0.94,a,BY
+1,5735.36,550.18,10.51,17974.62,0.38,0.24,a,SH
+2,6493.5,797.42,8.39,2067.94,0.38,0.17,a,NW
