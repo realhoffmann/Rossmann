@@ -14,6 +14,26 @@ const openOnly = defineModel<boolean>('openOnly', {required: true});
 const promoOnly = defineModel<boolean>('promoOnly', {required: true});
 const onlySchoolHoliday = defineModel<boolean>('onlySchoolHoliday', {required: true});
 
+// Provide a safe v-model for the DatePicker similar to GlobalFiltersBar: map nulls
+// to current Date objects for the picker's view and map them back to nulls on set.
+const dateRangeForPicker = computed<([Date, Date] | null) | undefined>({
+  get() {
+    const cur = dateRange as unknown as { value: [Date | null, Date | null] };
+    const val = cur.value;
+    if (!val) return undefined;
+    const [s, e] = val;
+    return [s ?? new Date(), e ?? new Date()];
+  },
+  set(v) {
+    const cur = dateRange as unknown as { value: [Date | null, Date | null] };
+    if (!v) {
+      cur.value = [null, null];
+      return;
+    }
+    cur.value = [v[0] ?? null, v[1] ?? null];
+  },
+});
+
 const props = defineProps<{
   limits: Limits;
   stateOptions: SelectOption[];
@@ -105,7 +125,7 @@ const sliderDisabled = computed(
       </div>
       <div>
         <label class="stat-label">Date range</label>
-        <DatePicker v-model="dateRange" selectionMode="range" showIcon class="w-full" dateFormat="yy-mm-dd"/>
+        <DatePicker v-model="dateRangeForPicker" selectionMode="range" showIcon class="w-full" dateFormat="yy-mm-dd"/>
       </div>
       <div>
         <label class="stat-label">

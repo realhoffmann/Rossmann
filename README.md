@@ -44,6 +44,17 @@ jupyter notebook
 Open the notebook inside the `EDA` folder and execute it to generate all statistical summaries, outlier detection, time
 based analysis, geo visualizations, and interactive charts.
 
+### 5. Run Frontend ( for interactive visualizations )
+
+First copy the Data/processed folder to the frontend/public directory.
+Change directory to `/frontend', then install dependencies and start the development server.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 ## Project Structure
 
 ```

@@ -37,17 +37,17 @@ function createRossmannData() {
         if (!limits.value.dateMax || row.Date > limits.value.dateMax) limits.value.dateMax = row.Date;
     }
 
-    // Attempt restore from localStorage
     function tryRestoreFromLocalStorage(): boolean {
         try {
             const raw = localStorage.getItem(ROWS_KEY);
             if (!raw) return false;
             const parsed = JSON.parse(raw) as any[];
             if (!Array.isArray(parsed) || parsed.length === 0) return false;
-            rows.value = parsed
+            const restored = parsed
                 .map((r) => ({...r, Date: r.Date ? new Date(String(r.Date)) : null}))
                 .filter((r) => r.Date !== null) as RossmannRow[];
-            // recompute limits
+            if (!restored.length) return false;
+            rows.value = restored;
             limits.value = {
                 salesMin: Number.POSITIVE_INFINITY,
                 salesMax: 0,
@@ -57,6 +57,7 @@ function createRossmannData() {
                 dateMax: null,
             };
             rows.value.forEach((row) => updateLimits(row));
+            dateRange.value = [limits.value.dateMin, limits.value.dateMax];
             progress.value = 100;
             return true;
         } catch (err) {
@@ -76,10 +77,6 @@ function createRossmannData() {
         }
     }
 
-    // try restore on init
-    tryRestoreFromLocalStorage();
-
-    // filters / UI state
     const storeQuery = ref('');
     const selectedStates = ref<string[]>([]);
     const selectedStoreTypes = ref<string[]>([]);
@@ -89,6 +86,8 @@ function createRossmannData() {
     const openOnly = ref(false);
     const promoOnly = ref(false);
     const onlySchoolHoliday = ref(false);
+
+    tryRestoreFromLocalStorage();
 
     const stateOptions = computed<SelectOption[]>(() =>
         Array.from(new Set(rows.value.map((r) => r.State)))
@@ -140,8 +139,8 @@ function createRossmannData() {
             if (promoOnly.value && !row.Promo) return false;
             if (onlySchoolHoliday.value && !row.SchoolHoliday) return false;
             if (start && row.Date < start) return false;
-            if (end && row.Date > end) return false;
-            return true;
+            return !(end && row.Date > end);
+
         });
     });
 
@@ -203,6 +202,8 @@ function createRossmannData() {
         fastMode.value = !full;
         sampleLimit.value = full ? null : 25_000;
         loading.value = true;
+        // clear previous errors when starting a load so the loader/progress show cleanly
+        errorMessage.value = '';
         totalRows.value = 0;
         progress.value = 0;
         rows.value = [];
@@ -228,54 +229,116 @@ function createRossmannData() {
         };
 
         await new Promise<void>((resolve, reject) => {
-            Papa.parse<Record<string, unknown>>(dataUrl, {
-                download: true,
-                header: true,
-                dynamicTyping: true,
-                skipEmptyLines: true,
-                worker: true,
-                step: (result, parser) => {
-                    const row = normalizeRow(result.data);
-                    if (row) {
-                        rows.value.push(row);
-                        updateLimits(row);
-                    }
-                    totalRows.value += 1;
-                    progress.value = Math.min(100, Math.round((totalRows.value / expectedRows) * 100));
+            const startDownloadParse = () => {
+                Papa.parse<Record<string, unknown>>(dataUrl, {
+                    download: true,
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    worker: false,
+                    step: (result, parser) => {
+                        const row = normalizeRow(result.data);
+                        if (row) {
+                            rows.value.push(row);
+                            updateLimits(row);
+                        }
+                        totalRows.value += 1;
+                        progress.value = Math.min(100, Math.round((totalRows.value / expectedRows) * 100));
 
-                    if (sampleLimit.value && totalRows.value >= sampleLimit.value) {
-                        parser.abort();
+                        if (sampleLimit.value && totalRows.value >= sampleLimit.value) {
+                            parser.abort();
+                            finalize();
+                            resolve();
+                        }
+                    },
+                    complete: () => {
                         finalize();
                         resolve();
+                    },
+                    error: (err: any) => {
+                        console.warn('Papa.download parse failed, will try fetch+parse fallback:', err);
+                        const msg = err && (err.message ?? String(err)) ? (err.message ?? String(err)) : '';
+                        if (String(msg).includes('Range Not Satisfiable') || String(msg).includes('416')) {
+                            fallbackFetchParse().then(resolve).catch(reject);
+                        } else {
+                            fallbackFetchParse().then(resolve).catch((fallbackErr) => {
+                                console.error('Both download parse and fallback fetch failed', fallbackErr);
+                                errorMessage.value = String(msg || (fallbackErr?.message ?? fallbackErr ?? 'Unknown error'));
+                                loading.value = false;
+                                progress.value = 0;
+                                reject(fallbackErr);
+                            });
+                        }
+                    },
+                });
+            };
+
+            const fallbackFetchParse = async () => {
+                try {
+                    const resp = await fetch(dataUrl);
+                    if (!resp.ok) {
+                        const msg = `Failed to fetch CSV for fallback: ${resp.status} ${resp.statusText}`;
+                        errorMessage.value = msg;
+                        loading.value = false;
+                        progress.value = 0;
+                        throw new Error(msg);
                     }
-                },
-                complete: () => {
-                    finalize();
-                    resolve();
-                },
-                error: (err) => {
-                    console.error('Error loading Rossmann data:', err);
-                    errorMessage.value = err.message;
-                    loading.value = false;
-                    progress.value = 0;
-                    reject(err);
-                },
-            });
+                    const txt = await resp.text();
+                    if (!txt || txt.trim().length === 0) {
+                        const msg = 'Fetched CSV is empty during fallback. Ensure the file exists under frontend/public/data.';
+                        errorMessage.value = msg;
+                        loading.value = false;
+                        progress.value = 0;
+                        throw new Error(msg);
+                    }
+                    Papa.parse<Record<string, unknown>>(txt, {
+                        header: true,
+                        dynamicTyping: true,
+                        skipEmptyLines: true,
+                        worker: false,
+                        step: (result, parser) => {
+                            const row = normalizeRow(result.data);
+                            if (row) {
+                                rows.value.push(row);
+                                updateLimits(row);
+                            }
+                            totalRows.value += 1;
+                            progress.value = Math.min(100, Math.round((totalRows.value / expectedRows) * 100));
+                            if (sampleLimit.value && totalRows.value >= sampleLimit.value) {
+                                parser.abort();
+                                finalize();
+                                resolve();
+                            }
+                        },
+                        complete: () => {
+                            finalize();
+                            resolve();
+                        },
+                        error: (e: any) => {
+                            console.error('Fallback parse failed:', e);
+                            errorMessage.value = e && (e.message ?? String(e)) ? (e.message ?? String(e)) : 'Fallback parse failed';
+                            loading.value = false;
+                            progress.value = 0;
+                            reject(e);
+                        },
+                    });
+                } catch (e) {
+                    throw e;
+                }
+            };
+            startDownloadParse();
         });
     }
 
     async function loadIfNeeded(full: boolean = false) {
-        // if already loaded in memory, skip
         if (rows.value.length > 0) {
             if (full && fastMode.value) {
                 await loadData(true);
             }
             return;
         }
-        // try to restore from localStorage (maybe persisted earlier)
         const restored = tryRestoreFromLocalStorage();
         if (restored) return;
-        // else: perform network load
         await loadData(full);
     }
 

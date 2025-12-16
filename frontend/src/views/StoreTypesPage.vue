@@ -3,9 +3,6 @@ import GlobalFiltersBar from '../components/GlobalFiltersBar.vue';
 import StoreTypeChart from '../components/charts/StoreTypeChart.vue';
 import StateChart from '../components/charts/StateChart.vue';
 import {useRossmannData} from '../composables/useRossmannData';
-import {useSettingsStore} from '../stores/settings';
-
-const settings = useSettingsStore();
 
 const menuItems = [
   {label: 'Overview', icon: 'pi pi-home', command: () => (window.location.hash = '#/overview')},
